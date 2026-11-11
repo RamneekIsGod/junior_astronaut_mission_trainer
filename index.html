@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta
+            name="description"
+            content="Outpost Zero is an educational Moon and Mars habitat management game."
+        />
+        <meta name="theme-color" content="#0b1524" />
+        <title>Outpost Zero | Moon & Mars Base Simulator</title>
+        <link rel="stylesheet" href="style.css" />
+        <script src="script.js" defer></script>
+    </head>
+    <body>
+        <header>
+            <div class="brand">
+                <h1>🛰️ Outpost Zero</h1>
+                <span class="sub-brand">Planetary Habitat Management Game</span>
+            </div>
+
+            <div
+                id="stats"
+                aria-live="polite"
+                aria-label="Mission statistics"
+            ></div>
+
+            <nav class="header-actions" aria-label="Game tools">
+                <button
+                    id="btn_guide"
+                    class="btn-sm"
+                    type="button"
+                    title="Learn about the science behind the game"
+                >
+                    📖 Field Guide
+                </button>
+                <button
+                    id="btn_lb"
+                    class="btn-sm"
+                    type="button"
+                    title="View the shared leaderboard"
+                >
+                    🏆 Leaderboard
+                </button>
+                <button
+                    id="btn_audio"
+                    class="btn-sm"
+                    type="button"
+                    aria-pressed="true"
+                    title="Toggle sound effects"
+                >
+                    🔊 Sound on
+                </button>
+            </nav>
+        </header>
+
+        <div
+            id="scene"
+            aria-label="Illustration of the current planetary habitat"
+        >
+            <div id="stars" aria-hidden="true"></div>
+            <span id="earth" aria-hidden="true"></span>
+            <span id="sun" aria-hidden="true"></span>
+            <div id="sky_status" aria-live="polite"></div>
+            <div id="base" aria-hidden="true"></div>
+        </div>
+
+        <main>
+            <section class="panel-status" aria-labelledby="status-heading">
+                <h2 id="status-heading">📊 Outpost Life Support & Systems</h2>
+                <div id="gauges" aria-live="polite"></div>
+                <div id="fc" aria-live="polite"></div>
+            </section>
+
+            <section class="panel-controls" aria-labelledby="controls-heading">
+                <h2 id="controls-heading">
+                    🎛️ Mission Control: Power Allocation
+                </h2>
+
+                <div class="control-group">
+                    <label for="s_o2"
+                        >💨 Oxygen production <b id="v_o2">100%</b></label
+                    >
+                    <input
+                        type="range"
+                        id="s_o2"
+                        min="0"
+                        max="100"
+                        value="100"
+                        step="5"
+                        aria-describedby="tip-o2"
+                    />
+                    <small class="tip-txt" id="tip-o2"
+                        >Allocate energy to the habitat's oxygen-production
+                        system. The game uses a simplified production model, not
+                        MOXIE performance.</small
+                    >
+                </div>
+
+                <div class="control-group">
+                    <label for="s_gh"
+                        >🌱 Greenhouse lights <b id="v_gh">100%</b></label
+                    >
+                    <input
+                        type="range"
+                        id="s_gh"
+                        min="0"
+                        max="100"
+                        value="100"
+                        step="5"
+                        aria-describedby="tip-gh"
+                    />
+                    <small class="tip-txt" id="tip-gh"
+                        >Greenhouses supplement stored food. The game does not
+                        model a complete astronaut diet.</small
+                    >
+                </div>
+
+                <div class="control-group">
+                    <label for="s_lab"
+                        >🔬 Science laboratory <b id="v_lab">50%</b></label
+                    >
+                    <input
+                        type="range"
+                        id="s_lab"
+                        min="0"
+                        max="100"
+                        value="50"
+                        step="5"
+                        aria-describedby="tip-lab"
+                    />
+                    <small class="tip-txt" id="tip-lab"
+                        >Research earns Build Points (BP) that can be spent on
+                        upgrades.</small
+                    >
+                </div>
+
+                <label class="chk" for="shel">
+                    <input type="checkbox" id="shel" />
+                    <span
+                        >🛡️ <b>Use storm shelter:</b> In this game scenario, it
+                        halves the radiation received this turn, pauses lab
+                        research and reduces the harvest by 50%.</span
+                    >
+                </label>
+
+                <button id="go" type="button">Run Turn 1 ▶</button>
+            </section>
+
+            <section class="panel-shop" aria-labelledby="shop-heading">
+                <h2 id="shop-heading">
+                    🏗️ Habitat Construction & Tech Upgrades
+                </h2>
+                <p class="section-note">
+                    Upgrade costs and module performance are game-balancing
+                    values, not NASA procurement data.
+                </p>
+                <div id="shop"></div>
+            </section>
+
+            <section class="panel-log" aria-labelledby="log-heading">
+                <h2 id="log-heading">📜 Mission Flight Log & Alerts</h2>
+                <div
+                    id="log"
+                    role="log"
+                    aria-live="polite"
+                    aria-relevant="additions"
+                ></div>
+            </section>
+        </main>
+
+        <div id="ov" hidden></div>
+    </body>
+</html>
