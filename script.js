@@ -2,21 +2,21 @@
 
 /*
  * Outpost Zero
- * Educational habitat-management game.
- * IMPORTANT: rates and module values below are simplified game values,
- * not official NASA hardware specifications or mission design limits.
+ * Planetary habitat operations simulator.
+ * Mission operations and resource rates are configurable planning parameters.
+ * This is an independent educational simulator, not an official NASA system.
  */
 
 const API_BASE = "https://outpost-moderator.ramneek-space.workers.dev";
-const TURN_HOURS = 24;
-const MISSION_LENGTH = 60;
+const DAY_HOURS = 24;
+const MISSION_DAYS = 60;
 const BASE_LOAD_KW = 4;
 const MIN_BASE_POWER_FRACTION = 0.8;
 
 const SITES = {
   moon: {
     name: "Moon",
-    fullName: "Lunar South Pole scenario",
+    fullName: "Lunar South Pole",
     solarKW: 8,
     basePanels: 5,
     baseDose: 1.36,
@@ -24,11 +24,11 @@ const SITES = {
     sky: "#030712",
     ground: "#7e838f",
     description:
-      "The lunar south polar region has complex lighting and long-lasting shadows. This game simplifies the local lighting into an eight-turn daylight / four-turn shadow cycle; it is not a real site timetable."
+      "The lunar south pole receives highly variable sunlight. Crater rims and local terrain can create extended periods of illumination and persistent shadow."
   },
   mars: {
     name: "Mars",
-    fullName: "Jezero Crater scenario",
+    fullName: "Jezero Crater",
     solarKW: 3.5,
     basePanels: 12,
     sunlightFactor: 0.44,
@@ -37,7 +37,7 @@ const SITES = {
     sky: "#a8542b",
     ground: "#7c351e",
     description:
-      "Mars receives less sunlight than Earth, and dust can reduce solar output. The storm duration and power reduction in this game are simplified gameplay assumptions."
+      "Mars receives less sunlight than Earth. Atmospheric dust and regional dust storms can significantly reduce solar-array output."
   }
 };
 
@@ -52,23 +52,23 @@ const MODULES = {
   },
   reactor: {
     icon: "⚛️", name: "Fission Power Unit", cost: 120, max: 3,
-    description: "+24 kW steady game-scenario power, day and night."
+    description: "+24 kW continuous electrical output, day and night."
   },
   oxygen: {
     icon: "💨", name: "Oxygen Production Unit", cost: 35, max: 5,
-    description: "+1.7 kg O₂ per turn at full power; uses 4 kW. Not a MOXIE specification."
+    description: "Oxygen production: +1.7 kg O₂/day at full output; electrical demand: 4 kW."
   },
   greenhouse: {
     icon: "🌱", name: "Greenhouse Module", cost: 40, max: 5,
-    description: "+1.5 kg food per turn at full output; uses 3 kW."
+    description: "Fresh-food production: +1.5 kg/day at full output; electrical demand: 3 kW."
   },
   lab: {
     icon: "🔬", name: "Science Laboratory", cost: 50, max: 4,
-    description: "+3 science per turn at full power; uses 2 kW."
+    description: "Research output: +3 science units/day at full output; electrical demand: 2 kW."
   },
   shield: {
     icon: "🛡️", name: "Regolith Shield Layer", cost: 45, max: 8,
-    description: "Reduces remaining game radiation by 25% per layer. Simplified game rule."
+    description: "Each installed layer reduces the habitat radiation dose calculated by the mission model."
   }
 };
 
@@ -95,7 +95,7 @@ function playSound(type) {
     const presets = {
       click: { wave: "sine", start: 420, end: 760, duration: 0.06, volume: 0.055 },
       buy: { wave: "triangle", start: 340, end: 720, duration: 0.22, volume: 0.075 },
-      turn: { wave: "sine", start: 250, end: 520, duration: 0.16, volume: 0.065 },
+      day: { wave: "sine", start: 250, end: 520, duration: 0.16, volume: 0.065 },
       alert: { wave: "sawtooth", start: 360, end: 260, duration: 0.2, volume: 0.07 },
       win: { wave: "triangle", start: 520, end: 900, duration: 0.32, volume: 0.07 }
     };
@@ -116,16 +116,24 @@ function playSound(type) {
     oscillator.start(now);
     oscillator.stop(now + preset.duration);
   } catch (error) {
-    // Sound is optional. Audio failures must never stop the game.
+    // Sound is optional. Audio failures must never interrupt mission operations.
     console.debug("Sound effect unavailable:", error);
   }
 }
 
+function syncSoundButton() {
+  const button = $("btn_audio");
+  if (!button) return;
+
+  button.textContent = soundEnabled ? "🔊 Sound on" : "🔇 Sound off";
+  button.setAttribute("aria-label", soundEnabled ? "Sound on" : "Sound off");
+  button.setAttribute("aria-pressed", String(soundEnabled));
+  button.title = soundEnabled ? "Sound effects are on. Click to turn them off." : "Sound effects are off. Click to turn them on.";
+}
+
 function toggleSound() {
   soundEnabled = !soundEnabled;
-  const button = $("btn_audio");
-  button.textContent = soundEnabled ? "🔊 Sound on" : "🔇 Sound off";
-  button.setAttribute("aria-pressed", String(soundEnabled));
+  syncSoundButton();
   if (soundEnabled) playSound("click");
 }
 
@@ -154,18 +162,18 @@ function createMission(site) {
 
   S = {
     site,
-    turn: 1,
+    day: 1,
     bp: 120,
     science: 0,
     batteryKWh: 160,
     oxygenKg: 30,
     foodKg: 40,
     radiationMsv: 0,
-    starvationTurns: 0,
-    coldTurns: 0,
-    cropBlightTurns: 0,
-    dustStormTurns: 0,
-    flareNextTurn: false,
+    starvationDays: 0,
+    coldDays: 0,
+    cropBlightDays: 0,
+    dustStormDays: 0,
+    flareNextDay: false,
     over: false,
     won: false,
     log: [],
@@ -186,7 +194,7 @@ function createMission(site) {
   $("shel").checked = false;
   ["s_o2", "s_gh", "s_lab", "shel", "go"].forEach((id) => { $(id).disabled = false; });
 
-  addLog(`Welcome to ${definition.fullName}. Keep the crew supplied for ${MISSION_LENGTH} mission turns.`, "ok");
+  addLog(`Mission initiated: ${definition.fullName}. Maintain crew supplies throughout the ${MISSION_DAYS}-day mission.`, "ok");
   closeModal(false);
   updateUI();
   playSound("click");
@@ -194,7 +202,7 @@ function createMission(site) {
 
 function addLog(message, type = "") {
   if (!S) return;
-  S.log.unshift({ turn: S.turn, message, type });
+  S.log.unshift({ day: S.day, message, type });
   S.log = S.log.slice(0, 40);
   renderLog();
 }
@@ -202,11 +210,11 @@ function addLog(message, type = "") {
 /* ---------- Lighting and power model ---------- */
 function sunlightFactor() {
   if (S.site === "moon") {
-    // Simplified game cycle only: 8 bright turns followed by 4 shadow turns.
-    return ((S.turn - 1) % 12) < 8 ? 1 : 0;
+    // Lunar illumination planning cycle: 8 daylight days followed by 4 shadow days.
+    return ((S.day - 1) % 12) < 8 ? 1 : 0;
   }
   const ordinarySunlight = SITES.mars.sunlightFactor;
-  return S.dustStormTurns > 0 ? ordinarySunlight * 0.2 : ordinarySunlight;
+  return S.dustStormDays > 0 ? ordinarySunlight * 0.2 : ordinarySunlight;
 }
 
 function allocateEnergy(availableKWh, requestedKWh) {
@@ -240,13 +248,13 @@ function calculatePlan() {
   const solarKW = modules.solar * site.solarKW * sun;
   const reactorKW = modules.reactor * 24;
   const generationKW = solarKW + reactorKW;
-  const generationKWh = generationKW * TURN_HOURS;
+  const generationKWh = generationKW * DAY_HOURS;
 
   const requestedKWh = {
-    base: BASE_LOAD_KW * TURN_HOURS,
-    oxygen: modules.oxygen * 4 * settings.oxygen * TURN_HOURS,
-    greenhouse: modules.greenhouse * 3 * settings.greenhouse * TURN_HOURS,
-    lab: (shelter ? 0 : modules.lab * 2 * settings.lab * TURN_HOURS)
+    base: BASE_LOAD_KW * DAY_HOURS,
+    oxygen: modules.oxygen * 4 * settings.oxygen * DAY_HOURS,
+    greenhouse: modules.greenhouse * 3 * settings.greenhouse * DAY_HOURS,
+    lab: (shelter ? 0 : modules.lab * 2 * settings.lab * DAY_HOURS)
   };
 
   const availableKWh = generationKWh + S.batteryKWh;
@@ -257,7 +265,7 @@ function calculatePlan() {
   const oxygenProducedKg = modules.oxygen * 1.7 * settings.oxygen * allocation.fractions.oxygen;
   const greenhouseHarvestKg =
     modules.greenhouse * 1.5 * settings.greenhouse * allocation.fractions.greenhouse *
-    (shelter ? 0.5 : 1) * (S.cropBlightTurns > 0 ? 0.5 : 1);
+    (shelter ? 0.5 : 1) * (S.cropBlightDays > 0 ? 0.5 : 1);
   const scienceEarned = shelter
     ? 0
     : modules.lab * 3 * settings.lab * allocation.fractions.lab;
@@ -304,7 +312,7 @@ function renderStats() {
   const stats = $("stats");
   stats.replaceChildren();
   const items = [
-    ["Turn", `${S.turn} / ${MISSION_LENGTH}`],
+    ["Day", `${S.day} / ${MISSION_DAYS}`],
     ["Build Points", `${Math.floor(S.bp)} BP`],
     ["Science", format1(S.science)]
   ];
@@ -327,72 +335,118 @@ function renderGauges(plan) {
   renderGauge(container, "🍎 Food", S.foodKg, 80, "fd",
     `${format1(S.foodKg)} / 80 kg`, `${Math.round((S.foodKg / 80) * 100)}%`);
   renderGauge(container, "☢️ Radiation", S.radiationMsv, 100, "rad",
-    `${format1(S.radiationMsv)} / 100 mSv game limit`, S.radiationMsv >= 75 ? "HIGH" : "GAME LEVEL");
+    `${format1(S.radiationMsv)} / 100 mSv cumulative dose`, S.radiationMsv >= 75 ? "HIGH" : "NOMINAL");
   const shieldReduction = (1 - Math.pow(0.75, modules.shield)) * 100;
-  renderGauge(container, "🛡️ Shield", modules.shield, 8, "rad",
-    `${modules.shield} / 8 layers`, `${Math.round(shieldReduction)}% game reduction`);
+  renderGauge(container, "🛡️ Radiation Shield", modules.shield, 8, "rad",
+    `${modules.shield} / 8 layers`, `${Math.round(shieldReduction)}% estimated dose reduction`);
 }
 
 function renderForecast(plan) {
   const container = $("fc");
   container.replaceChildren();
-  const netKW = plan.generationKW - plan.demandKWh / TURN_HOURS;
+
+  const addMetric = (label, value, detail = "") => {
+    const row = makeElement("p", "forecast-metric");
+    row.appendChild(makeElement("span", "forecast-label", label));
+    row.appendChild(makeElement("strong", "forecast-value", value));
+    if (detail) {
+      row.appendChild(makeElement("small", "forecast-detail", detail));
+    }
+    container.appendChild(row);
+  };
+
+  const netKW = plan.generationKW - plan.demandKWh / DAY_HOURS;
   const oxygenNet = plan.oxygenProducedKg - 3.4;
   const foodNet = plan.greenhouseHarvestKg - 3;
 
-  const power = makeElement("p");
-  power.append("⚡ Average power: ");
-  power.appendChild(makeElement("b", "", `${format1(plan.generationKW)} kW generated`));
-  power.append(` · ${format1(plan.demandKWh / TURN_HOURS)} kW requested`);
-  power.append(" · ");
-  power.appendChild(makeElement("b", netKW >= 0 ? "good" : "warn", `${netKW >= 0 ? "+" : ""}${format1(netKW)} kW before battery support`));
-  container.appendChild(power);
-
-  const energy = makeElement("p");
-  energy.textContent = `🔋 Energy this turn: ${Math.round(plan.generationKWh)} kWh generated, ${Math.round(plan.usedKWh)} kWh allocated. Battery stores energy in kWh.`;
-  container.appendChild(energy);
+  addMetric(
+    "Power generation",
+    `${format1(plan.generationKW)} kW`,
+    "Available electrical output"
+  );
+  addMetric(
+    "Power demand",
+    `${format1(plan.demandKWh / DAY_HOURS)} kW`,
+    "Required average electrical load"
+  );
+  addMetric(
+    "Net power balance",
+    `${netKW >= 0 ? "+" : ""}${format1(netKW)} kW`,
+    "Before battery discharge"
+  );
+  addMetric(
+    "Daily energy",
+    `${Math.round(plan.generationKWh)} kWh generated`,
+    `${Math.round(plan.usedKWh)} kWh allocated to systems`
+  );
 
   if (plan.fractions.base < MIN_BASE_POWER_FRACTION) {
-    addParagraph(container, "🚨 Critical: habitat baseline power is below the safe game target.", "warn");
+    addParagraph(
+      container,
+      "Critical: habitat baseline power is below the required operating level.",
+      "warn forecast-alert"
+    );
   } else if (plan.fractions.oxygen < 0.99) {
-    addParagraph(container, "⚠️ Oxygen production is being reduced by an energy shortage.", "warn");
+    addParagraph(
+      container,
+      "Warning: oxygen production is being reduced by an electrical power shortage.",
+      "warn forecast-alert"
+    );
   } else if (plan.fractions.greenhouse < 0.99) {
-    addParagraph(container, "⚠️ Greenhouse lighting is being reduced by an energy shortage.", "warn");
+    addParagraph(
+      container,
+      "Warning: greenhouse output is being reduced by an electrical power shortage.",
+      "warn forecast-alert"
+    );
   }
 
-  const resourceRates = makeElement("p");
-  resourceRates.textContent = `💨 Oxygen change: ${oxygenNet >= 0 ? "+" : ""}${format1(oxygenNet)} kg/turn · 🍎 Food change: ${foodNet >= 0 ? "+" : ""}${format1(foodNet)} kg/turn`;
-  container.appendChild(resourceRates);
+  addMetric(
+    "Oxygen balance",
+    `${oxygenNet >= 0 ? "+" : ""}${format1(oxygenNet)} kg/day`,
+    "Production minus crew consumption"
+  );
+  addMetric(
+    "Food balance",
+    `${foodNet >= 0 ? "+" : ""}${format1(foodNet)} kg/day`,
+    "Harvest minus crew consumption"
+  );
 
-  let skyText;
+  const sun = sunlightFactor();
+  let environmentText;
   if (S.site === "moon") {
-    const cyclePosition = (S.turn - 1) % 12;
-    skyText = cyclePosition < 8
-      ? `☀️ Simplified lunar scenario: ${8 - cyclePosition} daylight turn(s) before shadow.`
-      : `🌑 Simplified shadow period: ${12 - cyclePosition} turn(s) remaining.`;
+    environmentText = sun > 0
+      ? "Lunar illumination: sunlight is available at the habitat site."
+      : "Lunar illumination: the habitat site is in shadow; stored energy supports operations.";
   } else {
-    skyText = S.dustStormTurns > 0
-      ? `🌪️ Dust storm scenario: solar output reduced for ${S.dustStormTurns} more turn(s).`
-      : "☀️ Mars scenario: skies are clear.";
+    environmentText = S.dustStormDays > 0
+      ? `Martian atmospheric dust: solar-array output is reduced for ${S.dustStormDays} more day(s).`
+      : "Martian atmospheric conditions: nominal solar-array output.";
   }
-  addParagraph(container, skyText);
-  if (S.flareNextTurn) addParagraph(container, "☀️💥 Solar particle event forecast for the next turn. Consider the shelter.", "warn");
-}
 
+  addParagraph(container, environmentText, "forecast-note");
+
+  if (S.flareNextDay) {
+    addParagraph(
+      container,
+      "Solar particle event forecast for the next day. Storm shelter activation is recommended.",
+      "warn forecast-alert"
+    );
+  }
+}
 function renderScene() {
   const site = SITES[S.site];
   const sun = sunlightFactor();
-  $("scene").style.background = `linear-gradient(${S.dustStormTurns > 0 ? "#542a17" : site.sky} 62%, ${site.ground} 62%)`;
+  $("scene").style.background = `linear-gradient(${S.dustStormDays > 0 ? "#542a17" : site.sky} 62%, ${site.ground} 62%)`;
   setText("earth", S.site === "moon" ? "🌍" : "");
-  setText("sun", S.site === "moon" ? (sun > 0 ? "☀️" : "🌑") : (S.dustStormTurns > 0 ? "🌪️" : "☀️"));
-  setText("sky_status", S.site === "moon" ? (sun > 0 ? "LUNAR DAY SCENARIO" : "LUNAR SHADOW SCENARIO") : (S.dustStormTurns > 0 ? "DUST STORM SCENARIO" : "CLEAR MARTIAN SKY"));
+  setText("sun", S.site === "moon" ? (sun > 0 ? "☀️" : "🌑") : (S.dustStormDays > 0 ? "🌪️" : "☀️"));
+  setText("sky_status", S.site === "moon" ? (sun > 0 ? "LUNAR DAYLIGHT" : "LUNAR SHADOW") : (S.dustStormDays > 0 ? "MARTIAN DUST STORM" : "MARTIAN ATMOSPHERIC CONDITIONS: NOMINAL"));
 
   const base = $("base");
   base.replaceChildren();
   const labels = [
     ["solar", "☀️", "Solar"], ["battery", "🔋", "Battery"], ["reactor", "⚛️", "Power"],
     ["oxygen", "💨", "Oxygen"], ["greenhouse", "🌱", "Greenhouse"],
-    ["lab", "🔬", "Lab"], ["shield", "🛡️", "Shield"]
+    ["lab", "🔬", "Lab"], ["shield", "🛡️", "Radiation Shield"]
   ];
   for (const [key, icon, label] of labels) {
     if (S.modules[key] < 1) continue;
@@ -429,7 +483,7 @@ function renderLog() {
   if (!S) return;
   log.replaceChildren();
   for (const entry of S.log.slice(0, 20)) {
-    const p = makeElement("p", `log-entry ${entry.type}`, `Turn ${entry.turn}: ${entry.message}`);
+    const p = makeElement("p", `log-entry ${entry.type}`, `Day ${entry.day}: ${entry.message}`);
     log.appendChild(p);
   }
 }
@@ -462,21 +516,21 @@ function updateUI() {
     const percent = Number(slider.value);
     label.textContent = `${percent}%`;
   }
-  $("go").textContent = `Run Turn ${S.turn} ▶`;
+  $("go").textContent = `Advance Day ${S.day} ▶`;
 }
 
-/* ---------- Turn processing ---------- */
+/* ---------- day processing ---------- */
 function checkFailure() {
   if (S.oxygenKg <= 0) return "oxygen";
-  if (S.starvationTurns >= 4) return "food";
+  if (S.starvationDays >= 4) return "food";
   if (S.radiationMsv >= 100) return "radiation";
-  if (S.coldTurns >= 2) return "cold";
+  if (S.coldDays >= 2) return "cold";
   return "";
 }
 
-function runTurn() {
+function runDay() {
   if (!S || S.over) return;
-  playSound("turn");
+  playSound("day");
   const plan = calculatePlan();
   const modules = S.modules;
   const shelterFactor = plan.shelter ? 0.5 : 1;
@@ -494,31 +548,31 @@ function runTurn() {
 
   const shieldFactor = Math.pow(0.75, modules.shield) * shelterFactor;
   let receivedDose = SITES[S.site].baseDose * shieldFactor;
-  if (S.flareNextTurn) {
+  if (S.flareNextDay) {
     receivedDose += SITES[S.site].flareDose * shieldFactor;
-    addLog(`Solar particle event scenario: ${format1(SITES[S.site].flareDose * shieldFactor)} mSv added this turn.`, "bad");
-    S.flareNextTurn = false;
+    addLog(`Solar particle event: ${format1(SITES[S.site].flareDose * shieldFactor)} mSv added to the daily dose.`, "bad");
+    S.flareNextDay = false;
     playSound("alert");
   }
   S.radiationMsv += receivedDose;
 
   if (plan.fractions.base < MIN_BASE_POWER_FRACTION) {
-    S.coldTurns += 1;
-    addLog("Habitat baseline power fell below the game's safe target. Thermal reserves are being depleted.", "bad");
+    S.coldDays += 1;
+    addLog("Habitat baseline power fell below the required operating level. Thermal reserves are being depleted.", "bad");
   } else {
-    S.coldTurns = 0;
+    S.coldDays = 0;
   }
 
   if (S.foodKg <= 0) {
-    S.starvationTurns += 1;
-    addLog(`Food stores are empty (${S.starvationTurns}/4 consecutive turns).`, "bad");
+    S.starvationDays += 1;
+    addLog(`Food stores are empty (${S.starvationDays}/4 consecutive days).`, "bad");
     playSound("alert");
   } else {
-    S.starvationTurns = Math.max(0, S.starvationTurns - 1);
+    S.starvationDays = Math.max(0, S.starvationDays - 1);
   }
 
-  if (S.dustStormTurns > 0) S.dustStormTurns -= 1;
-  if (S.cropBlightTurns > 0) S.cropBlightTurns -= 1;
+  if (S.dustStormDays > 0) S.dustStormDays -= 1;
+  if (S.cropBlightDays > 0) S.cropBlightDays -= 1;
 
   const failure = checkFailure();
   if (failure) {
@@ -526,12 +580,12 @@ function runTurn() {
     return;
   }
 
-  if (S.turn >= MISSION_LENGTH) {
+  if (S.day >= MISSION_DAYS) {
     finishMission(true, "success");
     return;
   }
 
-  S.turn += 1;
+  S.day += 1;
   if (Math.random() < 0.4) triggerEvent();
 
   if (checkFailure()) {
@@ -545,16 +599,16 @@ function triggerEvent() {
   const roll = Math.random();
   const modules = S.modules;
 
-  if (roll < 0.25 && !S.flareNextTurn) {
-    S.flareNextTurn = true;
-    addLog("Solar weather alert: a solar particle event is forecast for the next turn. Consider using the shelter.", "bad");
+  if (roll < 0.25 && !S.flareNextDay) {
+    S.flareNextDay = true;
+    addLog("Solar weather alert: a solar particle event is forecast for the next day. Consider using the shelter.", "bad");
     playSound("alert");
     return;
   }
 
-  if (roll < 0.45 && S.site === "mars" && S.dustStormTurns === 0) {
-    S.dustStormTurns = 4;
-    addLog("Dust storm scenario: solar-array output is reduced to 20% for the next four turns.", "bad");
+  if (roll < 0.45 && S.site === "mars" && S.dustStormDays === 0) {
+    S.dustStormDays = 4;
+    addLog("Atmospheric dust event: solar-array output is reduced to 20% for the next four days.", "bad");
     playSound("alert");
     return;
   }
@@ -562,14 +616,14 @@ function triggerEvent() {
   if (roll < 0.60) {
     const loss = Math.min(8, S.oxygenKg);
     S.oxygenKg = Math.max(0, S.oxygenKg - loss);
-    addLog(`Habitat maintenance alert: a simulated air-system leak reduced stored oxygen by ${format1(loss)} kg.`, "bad");
+    addLog(`Habitat maintenance alert: an air-system leak reduced stored oxygen reserves by ${format1(loss)} kg.`, "bad");
     playSound("alert");
     return;
   }
 
-  if (roll < 0.74 && S.cropBlightTurns === 0) {
-    S.cropBlightTurns = 3;
-    addLog("Greenhouse alert: a simulated crop-health problem halves harvest for three turns.", "bad");
+  if (roll < 0.74 && S.cropBlightDays === 0) {
+    S.cropBlightDays = 3;
+    addLog("Greenhouse alert: crop-health monitoring detected an issue. Harvest output is reduced by 50% for three days.", "bad");
     playSound("alert");
     return;
   }
@@ -586,23 +640,23 @@ function triggerEvent() {
   }
 
   S.bp += 50;
-  addLog("Cargo resupply scenario: +50 Build Points added to the mission account.", "ok");
+  addLog("Cargo resupply received: +50 Build Points added to the mission account.", "ok");
   playSound("buy");
 }
 
 /* ---------- Mission ending and score submission ---------- */
 function calculateDisplayedScore(won) {
   return Math.round(
-    S.science * 12 + S.turn * 10 + Math.max(0, 100 - S.radiationMsv) * 3 + (won ? 300 : 0)
+    S.science * 12 + S.day * 10 + Math.max(0, 100 - S.radiationMsv) * 3 + (won ? 300 : 0)
   );
 }
 
 const DEBRIEFS = {
   oxygen: "Stored oxygen ran out. Real spacecraft use carefully designed life-support systems, monitoring and backup equipment.",
-  food: "Food stores were empty for too many turns. A real mission needs carefully planned food reserves; a small greenhouse would only supplement the diet.",
-  radiation: "The game radiation meter reached its fictional 100 mSv failure threshold. This is not a universal NASA mission limit.",
-  cold: "The habitat did not receive enough baseline energy for two turns. Thermal control is an essential part of a spacecraft habitat.",
-  success: "Mission complete! You maintained the habitat through all 60 turns in this game scenario."
+  food: "Food reserves were depleted for too many consecutive days. Crew provisions require careful planning; greenhouse production is a supplement to stored food.",
+  radiation: "The mission radiation-dose threshold of 100 mSv was reached. Actual astronaut exposure limits depend on mission duration, age, and applicable radiation standards.",
+  cold: "The habitat did not receive adequate baseline power for two consecutive days. Thermal control is essential to crew safety.",
+  success: "Mission complete. The crew maintained the habitat throughout the 60-day mission."
 };
 
 function finishMission(won, reason) {
@@ -625,7 +679,7 @@ function buildButton(text, className, onClick) {
 function showEndModal(won, reason) {
   const content = document.createElement("div");
   const score = calculateDisplayedScore(won);
-  addParagraph(content, `Final score estimate: ${score} points · Turn ${S.turn} · ${format1(S.science)} science · ${format1(S.radiationMsv)} mSv game meter.`);
+  addParagraph(content, `Mission performance score: ${score} points · Day ${S.day} · ${format1(S.science)} science units · Cumulative radiation dose: ${format1(S.radiationMsv)} mSv.`);
 
   const debrief = makeElement("div", "tip");
   debrief.appendChild(makeElement("h3", "", "🛰️ Mission debrief"));
@@ -668,7 +722,7 @@ function showEndModal(won, reason) {
   );
   content.appendChild(restartRow);
 
-  openModal(won ? "🎉 Mission successful!" : `🚨 Mission ended on turn ${S.turn}`, content);
+  openModal(won ? "🎉 Mission successful!" : `🚨 Mission ended on Day ${S.day}`, content);
   input.focus();
 }
 
@@ -692,7 +746,7 @@ async function submitScore(input, submitButton, status) {
   const payload = {
     callsign,
     world: S.site === "moon" ? "Moon" : "Mars",
-    turns: S.turn,
+    turns: S.day,
     science: Number(S.science.toFixed(2)),
     radiation: Number(S.radiationMsv.toFixed(2)),
     won: Boolean(S.won)
@@ -762,12 +816,12 @@ function showFieldGuideModal() {
   playSound("click");
   const content = document.createElement("div");
   const items = [
-    ["🛰️ Mission goal", "Keep four crew members supplied for 60 mission turns in either the Moon or Mars game scenario."],
-    ["💨 Oxygen", "The game crew uses 3.4 kg of oxygen per turn. The production module is fictionalized and is not MOXIE."],
-    ["🌱 Food", "The game crew uses 3 kg of food per turn. A small greenhouse is a supplement, not a complete diet."],
-    ["⚡ Energy", "Power is measured in kW. Energy over a 24-hour game turn is measured in kWh. Batteries store kWh."],
-    ["☢️ Radiation", "The radiation meter and its 100 mSv failure point are game mechanics, not an official universal NASA limit."],
-    ["🔬 Research", "Science earns Build Points. Build costs, production rates, events and upgrades are game-balancing values."]
+    ["🛰️ Mission goal", "Maintain supplies for four crew members throughout a 60-day lunar or martian surface mission."],
+    ["💨 Oxygen", "Crew oxygen planning is set to 3.4 kg per day for four crew members. Oxygen generation capacity depends on the installed production system."],
+    ["🌱 Food", "Food planning is set to 3 kg per day. Greenhouse production supplements stored provisions."],
+    ["⚡ Energy", "Power is measured in kW. Energy over a 24-hour period is measured in kWh. Battery systems store electrical energy in kWh."],
+    ["☢️ Radiation", "The 100 mSv alert threshold is a mission planning parameter, not a universal astronaut exposure limit. Actual limits depend on mission duration, age and applicable radiation standards."],
+    ["🔬 Research", "Science output contributes to mission planning resources. Equipment costs, production rates, event frequencies and performance thresholds are configurable mission parameters."]
   ];
   for (const [heading, description] of items) {
     const box = makeElement("div", "tip");
@@ -797,7 +851,7 @@ async function showLeaderboardModal(highlightCallsign = "", filter = "all") {
 
   const thead = document.createElement("thead");
   const headerRow = document.createElement("tr");
-  for (const label of ["Rank", "Callsign", "World", "Turns", "Science", "Score"]) {
+  for (const label of ["Rank", "Callsign", "World", "Days", "Science", "Score"]) {
     headerRow.appendChild(makeElement("th", "", label));
   }
   thead.appendChild(headerRow);
@@ -850,11 +904,11 @@ async function showLeaderboardModal(highlightCallsign = "", filter = "all") {
 
 function showStartModal() {
   const content = document.createElement("div");
-  addParagraph(content, "Welcome to Outpost Zero! Balance electricity, oxygen, food, radiation protection and science to maintain a planetary habitat for 60 mission turns.");
+  addParagraph(content, "Welcome to Outpost Zero. Maintain a planetary habitat for a 60-day surface mission by balancing electrical power, oxygen, food, radiation protection and research objectives.");
 
   const note = makeElement("div", "tip");
   note.appendChild(makeElement("h3", "", "⚡ The core challenge"));
-  addParagraph(note, "Solar power varies with the simplified lighting scenario. Batteries store energy, while the fission power unit supplies steady power according to the game model. Protect life support before running optional research.");
+  addParagraph(note, "Solar generation depends on local illumination on the Moon and atmospheric conditions on Mars. Batteries provide stored energy during low-generation periods, while the fission power system supplies continuous electrical power. Prioritize life-support systems before optional research.");
   content.appendChild(note);
   addParagraph(content, `🌕 Moon: ${SITES.moon.description}`);
   addParagraph(content, `🔴 Mars: ${SITES.mars.description}`);
@@ -865,7 +919,7 @@ function showStartModal() {
     buildButton("🔴 Mars base", "pick", () => createMission("mars"))
   );
   content.appendChild(row);
-  addParagraph(content, "Outpost Zero is an independent educational game and is not an official NASA product or mission simulator.", "fine-print");
+  addParagraph(content, "Outpost Zero is an independent educational simulator and is not an official NASA product or mission system.", "fine-print");
   openModal("🛰️ Outpost Zero", content);
 }
 
@@ -890,7 +944,7 @@ $("shop").addEventListener("click", (event) => {
   $(id).addEventListener("change", updateUI);
 });
 
-$("go").addEventListener("click", runTurn);
+$("go").addEventListener("click", runDay);
 $("btn_audio").addEventListener("click", toggleSound);
 $("btn_lb").addEventListener("click", () => showLeaderboardModal());
 $("btn_guide").addEventListener("click", showFieldGuideModal);
@@ -921,7 +975,9 @@ document.addEventListener("keydown", (event) => {
 });
 
 /* ---------- Start ---------- */
-// The visible game waits for the player to choose Moon or Mars.
+// Show the current sound state immediately; no initial click is needed.
+syncSoundButton();
+// The mission interface waits for the player to select a destination.
 S = null;
 updateUI();
 showStartModal();
