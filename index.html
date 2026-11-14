@@ -2,7 +2,11 @@
 <html lang="en">
     <head>
         <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta
+            name="description"
+            content="Outpost Zero is an independent educational simulator about operating lunar and Martian habitats."
+        />
         <title>Outpost Zero | Lunar &amp; Martian Habitat Operations</title>
         <link rel="stylesheet" href="style.css" />
     </head>
@@ -14,11 +18,22 @@
                     >LUNAR &amp; MARTIAN HABITAT OPERATIONS</span
                 >
             </div>
+
             <div id="stats"></div>
+
             <div class="header-actions">
+                <button
+                    id="btn_new_mission"
+                    class="btn-sm"
+                    type="button"
+                    title="Choose a destination and start a new mission"
+                >
+                    🚀 New Mission
+                </button>
                 <button
                     id="btn_guide"
                     class="btn-sm"
+                    type="button"
                     title="Open the mission technical reference"
                 >
                     📖 Field Guide
@@ -26,6 +41,7 @@
                 <button
                     id="btn_lb"
                     class="btn-sm"
+                    type="button"
                     title="View Global Leaderboard"
                 >
                     🏆 Leaderboard
@@ -33,6 +49,7 @@
                 <button
                     id="btn_audio"
                     class="btn-sm"
+                    type="button"
                     title="Toggle Sound Effects"
                     aria-label="Sound on"
                     aria-pressed="true"
@@ -52,17 +69,19 @@
 
         <main>
             <section class="panel-status">
-                <h2>📊 Outpost Life Support & Systems</h2>
+                <h2>📊 Outpost Life Support &amp; Systems</h2>
                 <div id="gauges"></div>
                 <div id="fc"></div>
             </section>
 
             <section class="panel-controls">
                 <h2>🎛️ Mission Control: Daily Power Allocation</h2>
+
                 <div class="control-group">
-                    <label for="s_o2"
-                        >💨 Oxygen Generation &amp; Life Support <b id="v_o2"></b
-                    ></label>
+                    <label for="s_o2">
+                        💨 Oxygen Generation &amp; Life Support
+                        <b id="v_o2"></b>
+                    </label>
                     <input
                         type="range"
                         id="s_o2"
@@ -70,14 +89,16 @@
                         max="100"
                         value="100"
                     />
-                    <small class="tip-txt"
-                        >Crew oxygen allocation: 3.4 kg O₂ per day for four crew members.</small
-                    >
+                    <small class="tip-txt">
+                        Crew oxygen allocation: 3.4 kg O₂ per day for four crew
+                        members.
+                    </small>
                 </div>
+
                 <div class="control-group">
-                    <label for="s_gh"
-                        >🌱 Hydroponic Greenhouse Lights <b id="v_gh"></b
-                    ></label>
+                    <label for="s_gh">
+                        🌱 Hydroponic Greenhouse Lights <b id="v_gh"></b>
+                    </label>
                     <input
                         type="range"
                         id="s_gh"
@@ -85,14 +106,16 @@
                         max="100"
                         value="100"
                     />
-                    <small class="tip-txt"
-                        >Fresh-produce target: 3.0 kg per day. Stored provisions remain essential.</small
-                    >
+                    <small class="tip-txt">
+                        Fresh-produce target: 3.0 kg per day. Stored provisions
+                        remain essential.
+                    </small>
                 </div>
+
                 <div class="control-group">
-                    <label for="s_lab"
-                        >🔬 Astrobiology & Science Lab <b id="v_lab"></b
-                    ></label>
+                    <label for="s_lab">
+                        🔬 Astrobiology &amp; Science Lab <b id="v_lab"></b>
+                    </label>
                     <input
                         type="range"
                         id="s_lab"
@@ -100,34 +123,45 @@
                         max="100"
                         value="50"
                     />
-                    <small class="tip-txt"
-                        >Research output contributes to mission science objectives and resource planning.</small
-                    >
+                    <small class="tip-txt">
+                        Research output contributes to mission science
+                        objectives and resource planning.
+                    </small>
                 </div>
+
                 <label class="chk" for="shel">
                     <input type="checkbox" id="shel" />
                     <span class="shelter-icon" aria-hidden="true">🛡️</span>
                     <span class="shelter-copy">
-                        <strong class="shelter-title">Use Storm Shelter:</strong>
-                        <span class="shelter-subtitle">Out of Life Support</span>
-                        <span class="shelter-detail">Reduces crew radiation exposure for the day. Research pauses and greenhouse output is reduced by 50%.</span>
+                        <strong class="shelter-title"
+                            >Use Storm Shelter:</strong
+                        >
+                        <span class="shelter-subtitle"
+                            >Out of Life Support</span
+                        >
+                        <span class="shelter-detail">
+                            Reduces crew radiation exposure for the day.
+                            Research pauses and greenhouse output is reduced by
+                            50%.
+                        </span>
                     </span>
                 </label>
+
                 <button id="go" type="button">Advance Day 1 ▶</button>
             </section>
 
             <section class="panel-shop">
-                <h2>🏗️ Habitat Systems & Infrastructure</h2>
+                <h2>🏗️ Habitat Systems &amp; Infrastructure</h2>
                 <div id="shop"></div>
             </section>
 
             <section class="panel-log">
-                <h2>📜 Mission Flight Log & Alerts</h2>
+                <h2>📜 Mission Flight Log &amp; Alerts</h2>
                 <div id="log"></div>
             </section>
         </main>
 
-        <div id="ov"></div>
+        <div id="ov" hidden></div>
 
         <script src="script.js"></script>
     </body>
